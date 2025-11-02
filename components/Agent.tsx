@@ -118,12 +118,18 @@ const Agent = ({
     setCallStatus(CallStatus.CONNECTING);
 
     if (type === "generate") {
-      await vapi.start(process.env.NEXT_PUBLIC_VAPI_WORKFLOW_ID!, {
-        variableValues: {
-          username: userName,
-          userid: userId,
-        },
-      });
+      await vapi.start(
+        undefined,
+        undefined,
+        undefined,
+        process.env.NEXT_PUBLIC_VAPI_WORKFLOW_ID!,
+        {
+          variableValues: {
+            username: userName,
+            userid: userId,
+          },
+        }
+      );
     } else {
       let formattedQuestions = "";
       if (questions) {
@@ -140,9 +146,20 @@ const Agent = ({
     }
   };
 
-  const handleDisconnect = () => {
-    setCallStatus(CallStatus.FINISHED);
-    vapi.stop();
+  const handleDisconnect = async () => {
+    try {
+      // Try to stop or disconnect the vapi session if those APIs exist.
+      // Use type-assertion to avoid TS errors if methods are not declared on vapi.
+      if (typeof (vapi as any).stop === "function") {
+        await (vapi as any).stop();
+      } else if (typeof (vapi as any).disconnect === "function") {
+        await (vapi as any).disconnect();
+      }
+    } catch (error) {
+      console.error("Error while disconnecting vapi:", error);
+    } finally {
+      setCallStatus(CallStatus.FINISHED);
+    }
   };
 
   return (

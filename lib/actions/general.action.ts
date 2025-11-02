@@ -18,12 +18,10 @@ export async function createFeedback(params: CreateFeedbackParams) {
       .join("");
 
     const { object } = await generateObject({
-      model: google("gemini-2.0-flash-001", {
-        structuredOutputs: false,
-      }),
+      model: google("gemini-1.5-flash-preview"),
       schema: feedbackSchema,
       prompt: `
-        You are an AI interviewer analyzing a mock interview. Your task is to evaluate the candidate based on structured categories. Be thorough and detailed in your analysis. Don't be lenient with the candidate. If there are mistakes or areas for improvement, point them out.
+        You are an AI interviewer analyzing a mock interview. Your task is to evaluate the candidate based on structured categories. Be thorough and detailed in your analysis. Don\'t be lenient with the candidate. If there are mistakes or areas for improvement, point them out.
         Transcript:
         ${formattedTranscript}
 
@@ -92,33 +90,35 @@ export async function getFeedbackByInterviewId(
 
 export async function getLatestInterviews(
   params: GetLatestInterviewsParams
-): Promise<Interview[] | null> {
+): Promise<Interview[]> {
   const { userId, limit = 20 } = params;
 
-  const interviews = await db
+  const interviewsSnapshot = await db
     .collection("interviews")
     .orderBy("createdAt", "desc")
-    .where("finalized", "==", true)
-    .where("userId", "!=", userId)
-    .limit(limit)
+    .limit(100) // Fetch more and filter in code to avoid composite index
     .get();
 
-  return interviews.docs.map((doc) => ({
+  const interviews = interviewsSnapshot.docs.map((doc) => ({
     id: doc.id,
     ...doc.data(),
   })) as Interview[];
+
+  const filteredInterviews = interviews.filter(
+    (interview) => interview.finalized && (!userId || interview.userId !== userId)
+  );
+
+  return filteredInterviews.slice(0, limit);
 }
 
-export async function getInterviewsByUserId(
-  userId: string
-): Promise<Interview[] | null> {
-  const interviews = await db
+export async function getInterviewsByUserId(userId: string): Promise<Interview[]> {
+  const interviewsSnapshot = await db
     .collection("interviews")
     .where("userId", "==", userId)
     .orderBy("createdAt", "desc")
     .get();
 
-  return interviews.docs.map((doc) => ({
+  return interviewsSnapshot.docs.map((doc) => ({
     id: doc.id,
     ...doc.data(),
   })) as Interview[];
